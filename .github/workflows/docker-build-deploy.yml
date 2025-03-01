@@ -6,7 +6,7 @@ on:
       branch:
         description: 'Branch to build'
         required: true
-        default: 'main'
+        default: 'master'
       tag_version:
         description: 'Release tag to create (e.g., v1.0.0)'
         required: true
