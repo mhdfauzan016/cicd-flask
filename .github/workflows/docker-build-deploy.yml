@@ -1,0 +1,112 @@
+name: Build, Publish, and Deploy to VM
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        required: true
+        default: 'main'
+      tag_version:
+        description: 'Release tag to create (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      docker_username:
+        description: 'Docker Hub username (namespace)'
+        required: true
+      ssh_host:
+        description: 'VM IP address or hostname'
+        required: true
+      ssh_port:
+        description: 'SSH port'
+        required: true
+        default: '22'
+      ssh_username:
+        description: 'SSH username'
+        required: true
+        default: 'ubuntu'
+
+jobs:
+  build-publish-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      
+      - name: Extract version number
+        id: version
+        run: |
+          VERSION=${{ github.event.inputs.tag_version }}
+          echo "VERSION_NUM=${VERSION}" >> $GITHUB_OUTPUT
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/welcome:latest
+            ${{ secrets.DOCKER_HUB_USERNAME }}/welcome:${{ steps.version.outputs.VERSION_NUM }}
+          cache-from: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/welcome:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/welcome:buildcache,mode=max
+      
+      - name: Create Release Tag
+        run: |
+          git config --local user.email "mhhd.fauzan016@gmail.com"
+          git config --local user.name "Muhammad Fauzan"
+          git tag -a ${{ github.event.inputs.tag_version }} -m "Release ${{ github.event.inputs.tag_version }} from branch ${{ github.event.inputs.branch }}"
+          git push origin ${{ github.event.inputs.tag_version }}
+      
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ github.event.inputs.ssh_port }} ${{ github.event.inputs.ssh_host }} >> ~/.ssh/known_hosts
+      
+      - name: Deploy to VM
+        run: |
+          ssh -p ${{ github.event.inputs.ssh_port }} ${{ github.event.inputs.ssh_username }}@${{ github.event.inputs.ssh_host }} << 'EOF'
+            # Pull the latest Docker image
+            docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/welcome:${{ steps.version.outputs.VERSION_NUM }}
+            
+            # Run the new container
+            docker run -d --name welcome-container -p 8000:5000 ${{ secrets.DOCKER_HUB_USERNAME }}/welcome:${{ steps.version.outputs.VERSION_NUM }}
+            
+            # Verify deployment
+            echo "Deployment completed. Container ID:"
+            docker ps | grep welcome-container
+          EOF
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.tag_version }}
+          name: Release ${{ github.event.inputs.tag_version }}
+          body: |
+            Built from branch: ${{ github.event.inputs.branch }}
+            
+            ## Docker Image
+            The Docker image is publicly available on Docker Hub:
+            - `${{ secrets.DOCKER_HUB_USERNAME }}/welcome:latest`
+            - `${{ secrets.DOCKER_HUB_USERNAME }}/welcome:${{ steps.version.outputs.VERSION_NUM }}`
+            
+            ## Deployment
+            Successfully deployed to VM at ${{ github.event.inputs.ssh_host }} on port 8000.
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

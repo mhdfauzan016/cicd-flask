@@ -1,0 +1,9 @@
+version: '3'
+
+services:
+  welcome-app:
+    image: testing/welcome
+    container_name: welcome-container
+    ports:
+      - "8000:5000"
+    restart: unless-stopped

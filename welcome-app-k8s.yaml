@@ -1,0 +1,108 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: welcome-app-config
+  labels:
+    app: welcome-app
+data:
+  APP_PORT: "5000"
+  APP_ENV: "production"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: welcome-app-secret
+  labels:
+    app: welcome-app
+type: Opaque
+data:
+  API_KEY: SGVsbG8gV29ybGQ=
+  DB_PASSWORD: UGFzc3dvcmQxMjM=
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: welcome-app
+  labels:
+    app: welcome-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: welcome-app
+  template:
+    metadata:
+      labels:
+        app: welcome-app
+    spec:
+      containers:
+      - name: welcome-app
+        image: testing/welcome:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+          name: http
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        envFrom:
+        - configMapRef:
+            name: welcome-app-config
+        - secretRef:
+            name: welcome-app-secret
+        livenessProbe:
+          httpGet:
+            path: /welcome/health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /welcome/health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: welcome-app-service
+  labels:
+    app: welcome-app
+spec:
+  selector:
+    app: welcome-app
+  ports:
+  - port: 8000
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: welcome-app-ingress
+  labels:
+    app: welcome-app
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  rules:
+  - host: welcome-flask.com
+    http:
+      paths:
+      - path: /api(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: welcome-app-service
+            port:
+              number: 8000

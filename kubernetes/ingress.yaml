@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: welcome-app-ingress
+  labels:
+    app: welcome-app
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  rules:
+  - host: welcome-flask.com
+    http:
+      paths:
+      - path: /welcome(/|/.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: welcome-app-service
+            port:
+              number: 8000
