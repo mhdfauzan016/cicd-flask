@@ -2,7 +2,7 @@ version: '3'
 
 services:
   welcome-app:
-    image: testing/welcome
+    image: mhdfauzan016/welcome:latest
     container_name: welcome-container
     ports:
       - "8000:5000"

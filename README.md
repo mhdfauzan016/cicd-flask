@@ -57,10 +57,10 @@ Build and run using Docker:
 
 ```bash
 # Build the image
-docker build -t testing/welcome .
+docker build -t mhdfauzan016/welcome .
 
 # Run the container
-docker run -d -p 8000:5000 testing/welcome
+docker run -d -p 8000:5000 mhdfauzan016/welcome
 ```
 
 Access the application at:
@@ -101,10 +101,10 @@ kubectl apply -f kubernetes/ingress.yaml
 
 Access via the configured Ingress or use port forwarding:
 ```bash
-kubectl port-forward svc/welcome-app-service 8080:80
+kubectl port-forward svc/welcome-app-service 8000:5000
 ```
 
-Then access at http://localhost:8080/welcome/YourName
+Then access at http://localhost:8000/welcome/YourName
 
 ## CI/CD Pipeline
 

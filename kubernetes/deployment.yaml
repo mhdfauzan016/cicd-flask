@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: welcome-app
-        image: testing/welcome:latest
+        image: mhdfauzan016/welcome:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 5000
